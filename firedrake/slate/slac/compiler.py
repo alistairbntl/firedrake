@@ -102,14 +102,16 @@ def compile_expression(slate_expr, tsfc_parameters=None):
     cellfacetsym = ast.Symbol("cell_facets")
     mesh_layer_sym = ast.Symbol("layer")
     inc = []
-
+    declared_temps = []
     for cxt_kernel in builder.context_kernels:
         exp = cxt_kernel.tensor
         t = builder.get_temporary(exp)
 
-        # Declare and initialize the temporary
-        statements.append(ast.Decl(eigen_matrixbase_type(exp.shape), t))
-        statements.append(ast.FlatBlock("%s.setZero();\n" % t))
+        # Declare and initialize the temporary (if not previously declared)
+        if t not in declared_temps:
+            statements.append(ast.Decl(eigen_matrixbase_type(exp.shape), t))
+            statements.append(ast.FlatBlock("%s.setZero();\n" % t))
+            declared_temps.append(t)
 
         it_type = cxt_kernel.original_integral_type
 
