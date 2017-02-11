@@ -10,7 +10,13 @@ def mesh(request):
     return m
 
 
-def test_left_inverse(mesh):
+@pytest.fixture(scope='module', params=["colPivHouseholderQr",
+                                        "llt"])
+def factorization(request):
+    return request.param
+
+
+def test_direct_left_inverse(mesh):
     """Tests the SLATE expression A.inv * A = I"""
     V = FunctionSpace(mesh, "DG", 1)
     u = TrialFunction(V)
@@ -23,7 +29,7 @@ def test_left_inverse(mesh):
     assert (Result.M.values - np.identity(nnode) <= 1e-13).all()
 
 
-def test_right_inverse(mesh):
+def test_direct_right_inverse(mesh):
     """Tests the SLATE expression A * A.inv = I"""
     V = FunctionSpace(mesh, "DG", 1)
     u = TrialFunction(V)
@@ -32,6 +38,32 @@ def test_right_inverse(mesh):
 
     A = Tensor(form)
     Result = assemble(A * A.inv)
+    nnode = V.node_count
+    assert (Result.M.values - np.identity(nnode) <= 1e-13).all()
+
+
+def test_factor_left_inverse(mesh, factorization):
+    V = FunctionSpace(mesh, "DG", 1)
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    form = u*v*dx
+
+    A = Tensor(form)
+    parameters = {"inverse_factor": factorization}
+    Result = assemble(A.inv * A, slate_parameters=parameters)
+    nnode = V.node_count
+    assert (Result.M.values - np.identity(nnode) <= 1e-13).all()
+
+
+def test_factor_right_inverse(mesh, factorization):
+    V = FunctionSpace(mesh, "DG", 1)
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    form = u*v*dx
+
+    A = Tensor(form)
+    parameters = {"inverse_factor": factorization}
+    Result = assemble(A * A.inv, slate_parameters=parameters)
     nnode = V.node_count
     assert (Result.M.values - np.identity(nnode) <= 1e-13).all()
 
