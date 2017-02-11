@@ -630,18 +630,23 @@ class Solve(TensorOp):
 
     prec = 3
 
-    def __init__(self, LHS, RHS, eigen_parameters=None):
+    def __init__(self, A, b):
         """Constructor for the Solve class."""
-        assert LHS.shape[0] == LHS.shape[1], (
-            "Can only solve square systems for now."
+        assert A.rank == 2, (
+            "Left hand side operator needs to be a matrix."
         )
-        super(Solve, self).__init__(LHS, RHS)
-        self.eigen_parameters = eigen_parameters
+        assert A.shape[0] == A.shape[1], (
+            "Can only solve square matrix systems for now."
+        )
+        assert A.shape[1] == b.shape[0], (
+            "Dimension mismatch!"
+        )
+        super(Solve, self).__init__(A, b)
 
     def arguments(self):
         """Returns a tuple of arguments associated with the tensor."""
-        lhs, rhs = self.operands
-        symbolic = lhs.inv * rhs
+        A, b = self.operands
+        symbolic = A.inv * b
         return symbolic.arguments()
 
     def _output_string(self, prec=None):
