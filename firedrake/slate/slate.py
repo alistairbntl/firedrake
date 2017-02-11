@@ -185,6 +185,9 @@ class TensorBase(with_metaclass(ABCMeta)):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def solve(self, rhs):
+        return Solve(self, rhs)
+
     @cached_property
     def _hash_id(self):
         """Returns a hash id for use in dictionary objects."""
@@ -619,3 +622,34 @@ class Action(TensorOp):
     def _key(self):
         """Returns a key for hash and equality."""
         return (type(self), self.operands, self.actee)
+
+
+class Solve(TensorOp):
+    """
+    """
+
+    prec = 3
+
+    def __init__(self, LHS, RHS, eigen_parameters=None):
+        """Constructor for the Solve class."""
+        assert LHS.shape[0] == LHS.shape[1], (
+            "Can only solve square systems for now."
+        )
+        super(Solve, self).__init__(LHS, RHS)
+        self.eigen_parameters = eigen_parameters
+
+    def arguments(self):
+        """Returns a tuple of arguments associated with the tensor."""
+        lhs, rhs = self.operands
+        symbolic = lhs.inv * rhs
+        return symbolic.arguments()
+
+    def _output_string(self, prec=None):
+        """Creates a string representation."""
+        A, b = self.operands
+        return "Solve(%s, %s)" % (A, b)
+
+    def __repr__(self):
+        """Slate representation of the action of a tensor on a coefficient."""
+        A, b = self.operands
+        return "Solve(%r, %r)" % (A, b)
