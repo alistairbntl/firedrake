@@ -606,7 +606,7 @@ def metaphrase_slate_to_cpp(expr, temps, params, prec=None):
                     "'myMatrixFactorization'" % factorization
                 )
 
-            identity = "Matrix<double, %d, %d>::Identity()" % expr.shape
+            identity = "Eigen::Matrix<double, %d, %d>::Identity()" % expr.shape
             return "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(tensor,
                                                                     temps,
                                                                     params),

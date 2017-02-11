@@ -24,7 +24,8 @@ __all__ = ["assemble"]
 
 
 def assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
-             inverse=False, mat_type=None, sub_mat_type=None, appctx={}, **kwargs):
+             slate_parameters=None, inverse=False, mat_type=None,
+             sub_mat_type=None, appctx={}, **kwargs):
     """Evaluate f.
 
     :arg f: a :class:`~ufl.classes.Form`, :class:`~ufl.classes.Expr` or
@@ -39,6 +40,8 @@ def assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
          form.  For example, if a ``quadrature_degree`` of 4 is
          specified in this argument, but a degree of 3 is requested in
          the measure, the latter will be used.
+    :arg slate_parameters: (optional) dict of parameters specifying any
+         matrix factorizations to be used at the Slate level.
     :arg inverse: (optional) if f is a 2-form, then assemble the inverse
          of the local matrices.
     :arg mat_type: (optional) string indicating how a 2-form (matrix) should be
@@ -96,6 +99,7 @@ def assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
     if isinstance(f, (ufl.form.Form, slate.TensorBase)):
         return _assemble(f, tensor=tensor, bcs=solving._extract_bcs(bcs),
                          form_compiler_parameters=form_compiler_parameters,
+                         slate_parameters=slate_parameters,
                          inverse=inverse, mat_type=mat_type,
                          sub_mat_type=sub_mat_type, appctx=appctx,
                          collect_loops=collect_loops,
@@ -107,21 +111,27 @@ def assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
 
 
 def allocate_matrix(f, bcs=None, form_compiler_parameters=None,
-                    inverse=False, mat_type=None, sub_mat_type=None, appctx={}):
+                    slate_parameters=None, inverse=False, mat_type=None,
+                    sub_mat_type=None, appctx={}):
     """Allocate a matrix given a form.  To be used with :func:`create_assembly_callable`.
 
     .. warning::
 
        Do not use this function unless you know what you're doing.
     """
-    return _assemble(f, bcs=bcs, form_compiler_parameters=form_compiler_parameters,
-                     inverse=inverse, mat_type=mat_type, sub_mat_type=sub_mat_type,
+    return _assemble(f, bcs=bcs,
+                     form_compiler_parameters=form_compiler_parameters,
+                     slate_parameters=slate_parameters, inverse=inverse,
+                     mat_type=mat_type, sub_mat_type=sub_mat_type,
                      appctx=appctx,
                      allocate_only=True)
 
 
-def create_assembly_callable(f, tensor=None, bcs=None, form_compiler_parameters=None,
-                             inverse=False, mat_type=None, sub_mat_type=None):
+def create_assembly_callable(f, tensor=None, bcs=None,
+                             form_compiler_parameters=None,
+                             slate_parameters=None,
+                             inverse=False, mat_type=None,
+                             sub_mat_type=None):
     """Create a callable object than be used to assemble f into a tensor.
 
     This is really only designed to be used inside residual and
@@ -138,6 +148,7 @@ def create_assembly_callable(f, tensor=None, bcs=None, form_compiler_parameters=
         return tensor.assemble
     loops = _assemble(f, tensor=tensor, bcs=bcs,
                       form_compiler_parameters=form_compiler_parameters,
+                      slate_parameters=slate_parameters,
                       inverse=inverse, mat_type=mat_type,
                       sub_mat_type=sub_mat_type,
                       collect_loops=True)
@@ -146,9 +157,8 @@ def create_assembly_callable(f, tensor=None, bcs=None, form_compiler_parameters=
 
 @utils.known_pyop2_safe
 def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
-              inverse=False, mat_type=None, sub_mat_type=None,
-              appctx={},
-              collect_loops=False,
+              slate_parameters=None, inverse=False, mat_type=None,
+              sub_mat_type=None, appctx={}, collect_loops=False,
               allocate_only=False):
     """Assemble the form or Slate expression f and return a Firedrake object
     representing the result. This will be a :class:`float` for 0-forms/rank-0
@@ -157,16 +167,18 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
 
     :arg bcs: A tuple of :class`.DirichletBC`\s to be applied.
     :arg tensor: An existing tensor object into which the form should be
-        assembled. If this is not supplied, a new tensor will be created for
-        the purpose.
+         assembled. If this is not supplied, a new tensor will be created for
+         the purpose.
     :arg form_compiler_parameters: (optional) dict of parameters to pass to
-        the form compiler.
+         the form compiler.
+    :arg slate_parameters: (optional) dict of parameters specifying any
+         matrix factorizations to be used at the Slate level.
     :arg inverse: (optional) if f is a 2-form, then assemble the inverse
          of the local matrices.
     :arg mat_type: (optional) type for assembled matrices, one of
-        "nest", "aij", "baij", or "matfree".
+         "nest", "aij", "baij", or "matfree".
     :arg sub_mat_type: (optional) type for assembled sub matrices
-        inside a "nest" matrix.  One of "aij" or "baij".
+         inside a "nest" matrix.  One of "aij" or "baij".
     :arg appctx: Additional information to hang on the assembled
          matrix if an implicit matrix is requested (mat_type "matfree").
     """
@@ -186,7 +198,8 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
     form_compiler_parameters["assemble_inverse"] = inverse
 
     if isinstance(f, slate.TensorBase):
-        kernels = slac.compile_expression(f, tsfc_parameters=form_compiler_parameters)
+        kernels = slac.compile_expression(f, eigen_parameters=slate_parameters,
+                                          tsfc_parameters=form_compiler_parameters)
         integral_types = [kernel.kinfo.integral_type for kernel in kernels]
     else:
         kernels = tsfc_interface.compile_form(f, "form", parameters=form_compiler_parameters, inverse=inverse)
