@@ -33,7 +33,7 @@ from ufl.form import Form
 
 
 __all__ = ['Tensor', 'Inverse', 'Transpose', 'Negative',
-           'Add', 'Sub', 'Mul', 'Action']
+           'Add', 'Sub', 'Mul', 'Action', 'Solve']
 
 
 class CheckRestrictions(MultiFunction):
