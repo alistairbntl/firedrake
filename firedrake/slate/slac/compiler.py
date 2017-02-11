@@ -27,7 +27,8 @@ from firedrake.slate.slate import (TensorBase, Tensor,
                                    Transpose, Inverse, Negative,
                                    Add, Sub, Mul, Action, Solve)
 from firedrake.slate.slac.kernel_builder import KernelBuilder
-from firedrake.slate.slac.parameters import default_parameters
+from firedrake.slate.slac.parameters import (eigen_factorizations,
+                                             default_parameters)
 from firedrake import op2
 
 from pyop2.utils import get_petsc_dir
@@ -86,6 +87,11 @@ def compile_expression(slate_expr,
 
     if eigen_parameters is None:
         eigen_parameters = default_parameters()
+
+    else:
+        _ = default_parameters()
+        _.update(eigen_parameters)
+        eigen_parameters = _
 
     # Initialize coefficients, shape and statements list
     expr_coeffs = slate_expr.coefficients()
@@ -589,8 +595,17 @@ def metaphrase_slate_to_cpp(expr, temps, params, prec=None):
     elif isinstance(expr, Inverse):
         tensor, = expr.operands
 
-        if params.get("inverse_factor", None):
+        if params.get("inverse_factor"):
             factorization = params.get("inverse_factor")
+
+            if factorization not in eigen_factorizations:
+                raise ValueError(
+                    "%s is not a supported factorization. "
+                    "Be sure to specify your factorization in "
+                    "the lower-camel-case format. For example: "
+                    "'myMatrixFactorization'" % factorization
+                )
+
             identity = "Matrix<double, %d, %d>::Identity()" % expr.shape
             return "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(tensor,
                                                                     temps,
@@ -636,7 +651,15 @@ def metaphrase_slate_to_cpp(expr, temps, params, prec=None):
 
     elif isinstance(expr, Solve):
         A, b = expr.operands
-        factorization = params.get("local_solve", "colPivHouseholderQr")
+        factorization = params.get("local_solve")
+
+        if factorization not in eigen_factorizations:
+            raise ValueError(
+                "%s is not a supported factorization. "
+                "Be sure to specify your factorization in "
+                "the lower-camel-case format. For example: "
+                "'myMatrixFactorization'" % factorization
+            )
 
         result = "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(A, temps,
                                                                   params,
