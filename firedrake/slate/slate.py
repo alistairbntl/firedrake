@@ -188,6 +188,15 @@ class TensorBase(with_metaclass(ABCMeta)):
     def solve(self, rhs):
         return Solve(self, rhs)
 
+    @abstractproperty
+    def _complexity(self):
+        """Returns an integer totaling the relevant complexity
+        of the tensor expression. This is done by summing the
+        complexity of each tensor in the expression. This
+        value is a function of operator precedence if the
+        expression is not a terminal tensor.
+        """
+
     @cached_property
     def _hash_id(self):
         """Returns a hash id for use in dictionary objects."""
@@ -282,6 +291,18 @@ class Tensor(TensorBase):
         """
         return self.form.subdomain_data()
 
+    @cached_property
+    def _complexity(self):
+        """Returns an integer totaling the relevant complexity
+        of the tensor expression. This is done by summing the
+        complexity of each tensor in the expression. This
+        value is a function of operator precedence if the
+        expression is not a terminal tensor.
+
+        Terminal tensors have an expression complexity of `1`.
+        """
+        return 1
+
     def _output_string(self, prec=None):
         """Creates a string representation of the tensor."""
         return ["S", "V", "M"][self.rank] + "_%d" % self.id
@@ -341,6 +362,15 @@ class TensorOp(TensorBase):
         return {self.ufl_domain(): sd}
 
     @cached_property
+    def _complexity(self):
+        """Returns an integer totaling the relevant complexity
+        of the tensor expression. This is done by summing the
+        complexity of each tensor in the expression. This
+        value is a function of operator precedence.
+        """
+        return self.prec + sum(op._complexity for op in self.operands)
+
+    @cached_property
     def _key(self):
         """Returns a key for hash and equality."""
         return (type(self), self.operands)
@@ -371,7 +401,7 @@ class Inverse(UnaryOp):
        This class will raise an error if the tensor is not square.
     """
 
-    prec = None
+    prec = 1
 
     def __init__(self, A):
         """Constructor for the Inverse class."""
@@ -397,7 +427,7 @@ class Inverse(UnaryOp):
 class Transpose(UnaryOp):
     """An abstract Slate class representing the transpose of a tensor."""
 
-    prec = None
+    prec = 1
 
     def arguments(self):
         """Returns the expected arguments of the resulting tensor of
@@ -479,7 +509,7 @@ class Add(BinaryOp):
     :arg B: another :class:`TensorBase` object.
     """
 
-    prec = 1
+    prec = 2
 
     def __init__(self, A, B):
         """Constructor for the Add class."""
@@ -507,7 +537,7 @@ class Sub(BinaryOp):
     :arg B: another :class:`TensorBase` object.
     """
 
-    prec = 1
+    prec = 2
 
     def __init__(self, A, B):
         """Constructor for the Sub class."""
@@ -537,7 +567,7 @@ class Mul(BinaryOp):
     :arg B: another :class:`TensorBase` object.
     """
 
-    prec = 2
+    prec = 3
 
     def __init__(self, A, B):
         """Constructor for the Mul class."""
@@ -570,7 +600,7 @@ class Action(TensorOp):
     :arg function: a :class:`firedrake.Function` object.
     """
 
-    prec = 2
+    prec = 3
 
     def __init__(self, tensor, function):
         """Constructor for the Action class."""
@@ -628,7 +658,7 @@ class Solve(TensorOp):
     """
     """
 
-    prec = 3
+    prec = 4
 
     def __init__(self, A, b):
         """Constructor for the Solve class."""
