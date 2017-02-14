@@ -475,7 +475,7 @@ def auxiliary_temporaries(builder, declared_temps):
     """
     aux_statements = []
     for exp in builder.aux_temps:
-        if isinstance(exp, (Inverse, Transpose)):
+        if isinstance(exp, Inverse):
             if builder._ref_counts[exp] > 1:
                 # Get the temporary for the particular expression
                 result = metaphrase_slate_to_cpp(exp, declared_temps)
